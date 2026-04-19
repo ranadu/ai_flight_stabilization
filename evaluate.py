@@ -1,3 +1,6 @@
+import os
+import random
+
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
@@ -7,12 +10,18 @@ from controller import PDController
 from train_model import ControlNet
 
 
+def set_seed(seed=42):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+
+
 def load_trained_model(model_path="control_model.pth"):
     checkpoint = torch.load(
-    model_path,
-    map_location=torch.device("cpu"),
-    weights_only=False
-)
+        model_path,
+        map_location=torch.device("cpu"),
+        weights_only=False
+    )
 
     model = ControlNet()
     model.load_state_dict(checkpoint["model_state_dict"])
@@ -39,11 +48,14 @@ def ai_control(model, theta, q, X_mean, X_std, y_mean, y_std):
     return float(u[0, 0])
 
 
-def run_simulation_with_pd(theta0_deg=10.0, steps=300):
+def run_simulation_with_pd(theta0_deg=10.0, q0_deg=0.0, steps=300, disturbance_std=0.01):
     sim = PitchDynamics()
     controller = PDController(kp=2.0, kd=0.6, u_limit=2.0)
 
-    state = sim.reset(theta0=np.deg2rad(theta0_deg), q0=0.0)
+    state = sim.reset(
+        theta0=np.deg2rad(theta0_deg),
+        q0=np.deg2rad(q0_deg)
+    )
 
     theta_history = []
     q_history = []
@@ -57,16 +69,29 @@ def run_simulation_with_pd(theta0_deg=10.0, steps=300):
         q_history.append(np.rad2deg(q))
         u_history.append(u)
 
-        disturbance = np.random.normal(0.0, 0.01)
+        disturbance = np.random.normal(0.0, disturbance_std)
         state = sim.step(u=u, disturbance=disturbance)
 
     return np.array(theta_history), np.array(q_history), np.array(u_history)
 
 
-def run_simulation_with_ai(model, X_mean, X_std, y_mean, y_std, theta0_deg=10.0, steps=300):
+def run_simulation_with_ai(
+    model,
+    X_mean,
+    X_std,
+    y_mean,
+    y_std,
+    theta0_deg=10.0,
+    q0_deg=0.0,
+    steps=300,
+    disturbance_std=0.01
+):
     sim = PitchDynamics()
 
-    state = sim.reset(theta0=np.deg2rad(theta0_deg), q0=0.0)
+    state = sim.reset(
+        theta0=np.deg2rad(theta0_deg),
+        q0=np.deg2rad(q0_deg)
+    )
 
     theta_history = []
     q_history = []
@@ -80,13 +105,15 @@ def run_simulation_with_ai(model, X_mean, X_std, y_mean, y_std, theta0_deg=10.0,
         q_history.append(np.rad2deg(q))
         u_history.append(u)
 
-        disturbance = np.random.normal(0.0, 0.01)
+        disturbance = np.random.normal(0.0, disturbance_std)
         state = sim.step(u=u, disturbance=disturbance)
 
     return np.array(theta_history), np.array(q_history), np.array(u_history)
 
 
-def plot_results(theta_pd, theta_ai, u_pd, u_ai, dt=0.01):
+def plot_case_results(case_name, theta_pd, theta_ai, u_pd, u_ai, dt=0.01, save_dir="results"):
+    os.makedirs(save_dir, exist_ok=True)
+
     time = np.arange(len(theta_pd)) * dt
 
     plt.figure(figsize=(10, 5))
@@ -94,10 +121,11 @@ def plot_results(theta_pd, theta_ai, u_pd, u_ai, dt=0.01):
     plt.plot(time, theta_ai, label="AI Controller", linestyle="--")
     plt.xlabel("Time [s]")
     plt.ylabel("Pitch Angle [deg]")
-    plt.title("Pitch Stabilization Comparison")
+    plt.title(f"Pitch Stabilization Comparison - {case_name}")
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
+    plt.savefig(os.path.join(save_dir, f"{case_name}_pitch.png"), dpi=200)
     plt.show()
 
     plt.figure(figsize=(10, 5))
@@ -105,25 +133,65 @@ def plot_results(theta_pd, theta_ai, u_pd, u_ai, dt=0.01):
     plt.plot(time, u_ai, label="AI Controller", linestyle="--")
     plt.xlabel("Time [s]")
     plt.ylabel("Control Input")
-    plt.title("Control Effort Comparison")
+    plt.title(f"Control Effort Comparison - {case_name}")
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
+    plt.savefig(os.path.join(save_dir, f"{case_name}_control.png"), dpi=200)
     plt.show()
 
 
-def main():
-    model, X_mean, X_std, y_mean, y_std = load_trained_model()
+def evaluate_case(model, X_mean, X_std, y_mean, y_std, case_name, theta0_deg, q0_deg):
+    print(f"\n--- {case_name} ---")
+    print(f"Initial condition: theta0 = {theta0_deg} deg, q0 = {q0_deg} deg/s")
 
-    theta_pd, q_pd, u_pd = run_simulation_with_pd(theta0_deg=10.0, steps=300)
+    theta_pd, q_pd, u_pd = run_simulation_with_pd(
+        theta0_deg=theta0_deg,
+        q0_deg=q0_deg,
+        steps=300
+    )
+
     theta_ai, q_ai, u_ai = run_simulation_with_ai(
-        model, X_mean, X_std, y_mean, y_std, theta0_deg=10.0, steps=300
+        model,
+        X_mean,
+        X_std,
+        y_mean,
+        y_std,
+        theta0_deg=theta0_deg,
+        q0_deg=q0_deg,
+        steps=300
     )
 
     print(f"Final PD pitch angle: {theta_pd[-1]:.4f} deg")
     print(f"Final AI pitch angle: {theta_ai[-1]:.4f} deg")
+    print(f"Final PD pitch rate:  {q_pd[-1]:.4f} deg/s")
+    print(f"Final AI pitch rate:  {q_ai[-1]:.4f} deg/s")
 
-    plot_results(theta_pd, theta_ai, u_pd, u_ai)
+    plot_case_results(case_name, theta_pd, theta_ai, u_pd, u_ai)
+
+
+def main():
+    set_seed(42)
+
+    model, X_mean, X_std, y_mean, y_std = load_trained_model()
+
+    test_cases = [
+        {"case_name": "case_1_positive_angle", "theta0_deg": 10.0, "q0_deg": 0.0},
+        {"case_name": "case_2_negative_angle", "theta0_deg": -15.0, "q0_deg": 0.0},
+        {"case_name": "case_3_pitch_rate_disturbance", "theta0_deg": 5.0, "q0_deg": 20.0},
+    ]
+
+    for case in test_cases:
+        evaluate_case(
+            model,
+            X_mean,
+            X_std,
+            y_mean,
+            y_std,
+            case_name=case["case_name"],
+            theta0_deg=case["theta0_deg"],
+            q0_deg=case["q0_deg"]
+        )
 
 
 if __name__ == "__main__":
