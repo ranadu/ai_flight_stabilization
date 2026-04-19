@@ -9,11 +9,11 @@ class ControlNet(nn.Module):
     def __init__(self):
         super().__init__()
         self.model = nn.Sequential(
-            nn.Linear(2, 16),
+            nn.Linear(2, 32),
             nn.ReLU(),
-            nn.Linear(16, 16),
+            nn.Linear(32, 32),
             nn.ReLU(),
-            nn.Linear(16, 1)
+            nn.Linear(32, 1)
         )
 
     def forward(self, x):

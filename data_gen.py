@@ -6,7 +6,7 @@ from controller import PDController
 
 
 def generate_dataset(
-    num_episodes=200,
+    num_episodes=400,
     steps_per_episode=200,
     output_file="training_data.csv"
 ):
@@ -16,8 +16,8 @@ def generate_dataset(
     rows = []
 
     for episode in range(num_episodes):
-        theta0_deg = np.random.uniform(-20.0, 20.0)
-        q0_deg = np.random.uniform(-30.0, 30.0)
+        theta0_deg = np.random.uniform(-30.0, 30.0)
+        q0_deg = np.random.uniform(-50.0, 50.0)
 
         theta0 = np.deg2rad(theta0_deg)
         q0 = np.deg2rad(q0_deg)
@@ -31,7 +31,7 @@ def generate_dataset(
 
             rows.append([theta, q, u])
 
-            disturbance = np.random.normal(loc=0.0, scale=0.01)
+            disturbance = np.random.normal(loc=0.0, scale=0.03)
             state = sim.step(u=u, disturbance=disturbance)
 
     with open(output_file, mode="w", newline="") as f:
