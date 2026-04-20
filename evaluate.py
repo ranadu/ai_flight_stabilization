@@ -111,6 +111,38 @@ def run_simulation_with_ai(
     return np.array(theta_history), np.array(q_history), np.array(u_history)
 
 
+def compute_metrics(theta_pd, theta_ai, u_pd, u_ai):
+    final_pd_pitch_error = theta_pd[-1]
+    final_ai_pitch_error = theta_ai[-1]
+
+    peak_abs_pitch_pd = np.max(np.abs(theta_pd))
+    peak_abs_pitch_ai = np.max(np.abs(theta_ai))
+
+    rms_pitch_difference = np.sqrt(np.mean((theta_ai - theta_pd) ** 2))
+    mean_abs_control_difference = np.mean(np.abs(u_ai - u_pd))
+
+    metrics = {
+        "final_pd_pitch_error_deg": final_pd_pitch_error,
+        "final_ai_pitch_error_deg": final_ai_pitch_error,
+        "peak_abs_pitch_pd_deg": peak_abs_pitch_pd,
+        "peak_abs_pitch_ai_deg": peak_abs_pitch_ai,
+        "rms_pitch_difference_deg": rms_pitch_difference,
+        "mean_abs_control_difference": mean_abs_control_difference,
+    }
+
+    return metrics
+
+
+def print_metrics(metrics):
+    print("Performance Metrics:")
+    print(f"  Final PD pitch error:        {metrics['final_pd_pitch_error_deg']:.4f} deg")
+    print(f"  Final AI pitch error:        {metrics['final_ai_pitch_error_deg']:.4f} deg")
+    print(f"  Peak |pitch| PD:             {metrics['peak_abs_pitch_pd_deg']:.4f} deg")
+    print(f"  Peak |pitch| AI:             {metrics['peak_abs_pitch_ai_deg']:.4f} deg")
+    print(f"  RMS pitch difference:        {metrics['rms_pitch_difference_deg']:.4f} deg")
+    print(f"  Mean |control difference|:   {metrics['mean_abs_control_difference']:.6f}")
+
+
 def plot_case_results(case_name, theta_pd, theta_ai, u_pd, u_ai, dt=0.01, save_dir="results"):
     os.makedirs(save_dir, exist_ok=True)
 
@@ -162,10 +194,8 @@ def evaluate_case(model, X_mean, X_std, y_mean, y_std, case_name, theta0_deg, q0
         steps=300
     )
 
-    print(f"Final PD pitch angle: {theta_pd[-1]:.4f} deg")
-    print(f"Final AI pitch angle: {theta_ai[-1]:.4f} deg")
-    print(f"Final PD pitch rate:  {q_pd[-1]:.4f} deg/s")
-    print(f"Final AI pitch rate:  {q_ai[-1]:.4f} deg/s")
+    metrics = compute_metrics(theta_pd, theta_ai, u_pd, u_ai)
+    print_metrics(metrics)
 
     plot_case_results(case_name, theta_pd, theta_ai, u_pd, u_ai)
 
